@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Batch Splitter // Grayscale</title>
     
-    <!-- FFmpeg.wasm Libraries -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd/ffmpeg.umd.js"></script>
-    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <!-- Using FFmpeg v0.11 (Does not require COOP/COEP headers) -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
     <style>
         :root {
@@ -18,7 +17,7 @@
             --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
 
         body {
             background-color: var(--bg);
@@ -27,151 +26,110 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            overflow-x: hidden;
         }
 
         .container {
             width: 90%;
-            max-width: 500px;
+            max-width: 450px;
             text-align: center;
-            animation: fadeIn 1.2s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         h1 {
             font-weight: 200;
-            letter-spacing: 4px;
+            letter-spacing: 5px;
             text-transform: uppercase;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             margin-bottom: 40px;
             color: var(--text);
         }
 
         /* Upload Area */
-        #dropZone {
+        .upload-box {
             border: 1px solid var(--border);
-            padding: 80px 20px;
-            border-radius: 2px;
+            padding: 50px 20px;
             cursor: pointer;
             transition: var(--transition);
-            background: rgba(255,255,255,0.01);
-            position: relative;
-            z-index: 10;
+            background: rgba(255,255,255,0.02);
+            margin-bottom: 20px;
         }
 
-        #dropZone:hover {
+        .upload-box:hover {
             border-color: var(--accent);
-            background: rgba(255,255,255,0.04);
+            background: rgba(255,255,255,0.05);
         }
 
-        #dropZone.dragover {
-            border-color: var(--accent);
-            background: rgba(255,255,255,0.1);
-            transform: scale(1.02);
-        }
-
-        #dropZone p {
-            font-size: 0.75rem;
+        .upload-box p {
+            font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--text);
-            pointer-events: none;
         }
 
-        /* Controls */
-        #controls {
-            margin-top: 30px;
-            display: none; /* Hidden until file selected */
+        /* UI Elements */
+        .controls {
+            display: none;
             flex-direction: column;
             gap: 20px;
-            animation: fadeIn 0.5s ease forwards;
+            margin-top: 20px;
         }
 
-        .input-group {
+        .input-row {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text);
         }
-
-        label { font-size: 0.7rem; text-transform: uppercase; color: var(--text); }
 
         input[type="number"] {
             background: transparent;
             border: none;
             border-bottom: 1px solid var(--border);
             color: var(--accent);
-            width: 50px;
+            width: 40px;
             text-align: center;
-            padding: 5px;
             outline: none;
-            transition: var(--transition);
         }
-
-        input[type="number"]:focus { border-color: var(--accent); }
 
         button {
             background: var(--accent);
             color: var(--bg);
             border: none;
-            padding: 15px 30px;
+            padding: 15px;
             text-transform: uppercase;
             letter-spacing: 2px;
             font-size: 0.7rem;
+            font-weight: bold;
             cursor: pointer;
             transition: var(--transition);
-            font-weight: bold;
         }
 
-        button:hover {
-            filter: invert(1);
-        }
+        button:hover { filter: invert(1); }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        button:disabled {
-            background: var(--border);
-            color: var(--text);
-            cursor: not-allowed;
-            filter: none;
-        }
-
-        /* Progress & Status */
         #status {
-            margin-top: 25px;
-            font-size: 0.65rem;
+            margin-top: 20px;
+            font-size: 0.6rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
             color: var(--text);
-            min-height: 1em;
+            letter-spacing: 1px;
         }
 
-        /* Download List */
-        #downloadList {
-            margin-top: 30px;
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .download-item {
-            font-size: 0.7rem;
+        .download-link {
+            display: block;
+            margin-top: 10px;
+            padding: 12px;
+            border: 1px solid var(--border);
             text-decoration: none;
             color: var(--accent);
-            border: 1px solid var(--border);
-            padding: 12px;
-            display: block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
             transition: var(--transition);
-            background: transparent;
         }
 
-        .download-item:hover {
-            background: var(--accent);
-            color: var(--bg);
-        }
+        .download-link:hover { border-color: var(--accent); }
 
         #fileInput { display: none; }
     </style>
@@ -179,156 +137,109 @@
 <body>
 
     <div class="container">
-        <h1>Video Batch Splitter</h1>
+        <h1>Video Splitter</h1>
 
-        <div id="dropZone">
-            <p id="dropText">Drop MP4 file or click to select</p>
+        <div class="upload-box" id="dropZone">
+            <p id="fileNameDisplay">Click or Drop MP4</p>
         </div>
+        
         <input type="file" id="fileInput" accept="video/mp4">
 
-        <div id="controls">
-            <div class="input-group">
-                <label>Split into how many clips?</label>
-                <input type="number" id="clipCount" value="2" min="2" max="50">
+        <div class="controls" id="controls">
+            <div class="input-row">
+                <span>Split into</span>
+                <input type="number" id="clipCount" value="2" min="2">
+                <span>Clips</span>
             </div>
-            <button id="processBtn">Start Batch Process</button>
+            <button id="startBtn">Process Video</button>
         </div>
 
-        <div id="status">Ready</div>
-        <div id="downloadList"></div>
+        <div id="status">Waiting for file...</div>
+        <div id="results"></div>
     </div>
 
     <script>
-        const { FFmpeg } = window.FFmpegWASM;
-        const { fetchFile, toBlobURL } = window.FFmpegUtil;
+        const { createFFmpeg, fetchFile } = FFmpeg;
+        const ffmpeg = createFFmpeg({ log: true });
         
-        let ffmpeg = null;
-        let selectedFile = null;
-
-        const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
-        const dropText = document.getElementById('dropText');
-        const controls = document.getElementById('controls');
-        const processBtn = document.getElementById('processBtn');
+        const dropZone = document.getElementById('dropZone');
         const status = document.getElementById('status');
-        const downloadList = document.getElementById('downloadList');
+        const controls = document.getElementById('controls');
+        const startBtn = document.getElementById('startBtn');
+        const results = document.getElementById('results');
         const clipCountInput = document.getElementById('clipCount');
 
-        // PREVENT BROWSER FROM OPENING DROPPED FILES
-        window.addEventListener('dragover', (e) => e.preventDefault());
-        window.addEventListener('drop', (e) => e.preventDefault());
+        let videoFile = null;
 
-        // INITIALIZE FFMPEG
-        async function initFFmpeg() {
-            try {
-                status.innerText = "Initializing Engine...";
-                ffmpeg = new FFmpeg();
-                
-                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-                await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                });
-                status.innerText = "System Ready";
-            } catch (e) {
-                console.error(e);
-                status.innerText = "Error: Check Console (Headers Required)";
-                alert("Note: This requires 'Cross-Origin-Embedder-Policy' headers. If you are testing locally, use a local server or deploy to Netlify with the _headers file.");
-            }
-        }
+        // 1. Initialize FFmpeg immediately
+        (async () => {
+            status.innerText = "Initializing Engine...";
+            await ffmpeg.load();
+            status.innerText = "Ready";
+        })();
 
-        initFFmpeg();
-
-        // FILE HANDLING
-        dropZone.addEventListener('click', () => fileInput.click());
-
-        dropZone.addEventListener('dragover', (e) => {
+        // 2. Handle File Selection
+        dropZone.onclick = () => fileInput.click();
+        
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = "#fff"; };
+        dropZone.ondragleave = () => { dropZone.style.borderColor = ""; };
+        dropZone.ondrop = (e) => {
             e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) handleFile(files[0]);
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) handleFile(e.target.files[0]);
-        });
-
-        function handleFile(file) {
-            if (file.type === "video/mp4" || file.name.endsWith('.mp4')) {
-                selectedFile = file;
-                dropText.innerText = `Selected: ${file.name}`;
-                controls.style.display = 'flex';
-                downloadList.innerHTML = "";
-                status.innerText = "File loaded. Ready to split.";
-            } else {
-                alert("Please upload an MP4 file.");
-            }
-        }
-
-        // PROCESSING
-        processBtn.onclick = async () => {
-            if (!ffmpeg || !selectedFile) return;
-
-            processBtn.disabled = true;
-            downloadList.innerHTML = "";
-            
-            const numClips = parseInt(clipCountInput.value);
-            const inputFileName = 'input.mp4';
-            
-            status.innerText = "Writing file to memory...";
-            await ffmpeg.writeFile(inputFileName, await fetchFile(selectedFile));
-
-            const duration = await getVideoDuration(selectedFile);
-            const segmentDuration = duration / numClips;
-
-            for (let i = 0; i < numClips; i++) {
-                const startTime = i * segmentDuration;
-                const outputName = `clip_${i + 1}.mp4`;
-                status.innerText = `Processing Clip ${i + 1} of ${numClips}...`;
-
-                // '-c copy' ensures exact same quality (no re-encoding)
-                await ffmpeg.exec([
-                    '-ss', startTime.toString(),
-                    '-t', segmentDuration.toString(),
-                    '-i', inputFileName,
-                    '-c', 'copy',
-                    outputName
-                ]);
-
-                const data = await ffmpeg.readFile(outputName);
-                const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
-                
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = outputName;
-                link.className = 'download-item';
-                link.innerText = `Download Part ${i + 1} (${Math.round(segmentDuration)}s)`;
-                downloadList.appendChild(link);
-            }
-
-            status.innerText = "All clips processed successfully.";
-            processBtn.disabled = false;
+            handleFile(e.dataTransfer.files[0]);
         };
 
-        function getVideoDuration(file) {
-            return new Promise((resolve) => {
-                const video = document.createElement('video');
-                video.preload = 'metadata';
-                video.onloadedmetadata = () => {
-                    resolve(video.duration);
-                };
-                video.src = URL.createObjectURL(file);
-            });
+        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+        function handleFile(file) {
+            if (file && file.type.includes("video")) {
+                videoFile = file;
+                document.getElementById('fileNameDisplay').innerText = file.name;
+                controls.style.display = "flex";
+                status.innerText = "File loaded. Ready to process.";
+            }
         }
+
+        // 3. Process Video
+        startBtn.onclick = async () => {
+            const numClips = parseInt(clipCountInput.value);
+            startBtn.disabled = true;
+            results.innerHTML = "";
+            
+            status.innerText = "Reading video data...";
+            const { name } = videoFile;
+            ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(videoFile));
+
+            // Get duration
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(videoFile);
+            video.onloadedmetadata = async () => {
+                const duration = video.duration;
+                const segmentTime = duration / numClips;
+
+                for (let i = 0; i < numClips; i++) {
+                    const start = i * segmentTime;
+                    const output = `part_${i + 1}.mp4`;
+                    status.innerText = `Processing part ${i + 1} of ${numClips}...`;
+
+                    // Using "-c copy" for exact quality & speed
+                    await ffmpeg.run('-ss', start.toString(), '-t', segmentTime.toString(), '-i', 'input.mp4', '-c', 'copy', output);
+
+                    const data = ffmpeg.FS('readFile', output);
+                    const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = output;
+                    a.className = "download-link";
+                    a.innerText = `Download Part ${i + 1}`;
+                    results.appendChild(a);
+                }
+
+                status.innerText = "Done.";
+                startBtn.disabled = false;
+            };
+        };
     </script>
 </body>
 </html>
