@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Batch Splitter // Grayscale</title>
+    <title>Batch Split & Merge // Grayscale</title>
     
-    <!-- Using FFmpeg v0.11 (Does not require COOP/COEP headers) -->
+    <!-- FFmpeg v0.11 for maximum compatibility -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
     <style>
         :root {
-            --bg: #0a0a0a;
+            --bg: #050505;
             --accent: #ffffff;
-            --text: #888888;
+            --secondary: #1a1a1a;
+            --text-dim: #666666;
             --border: #222222;
-            --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
@@ -24,222 +25,311 @@
             color: var(--accent);
             display: flex;
             justify-content: center;
-            align-items: center;
+            padding: 40px 20px;
             min-height: 100vh;
         }
 
         .container {
-            width: 90%;
-            max-width: 450px;
-            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            animation: fadeIn 0.8s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         h1 {
             font-weight: 200;
-            letter-spacing: 5px;
+            letter-spacing: 6px;
             text-transform: uppercase;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             margin-bottom: 40px;
-            color: var(--text);
+            text-align: center;
+            color: var(--text-dim);
         }
 
-        /* Upload Area */
-        .upload-box {
+        /* Drop Zone */
+        .upload-area {
             border: 1px solid var(--border);
-            padding: 50px 20px;
+            padding: 60px 20px;
+            text-align: center;
             cursor: pointer;
             transition: var(--transition);
-            background: rgba(255,255,255,0.02);
+            background: var(--secondary);
+            margin-bottom: 30px;
+        }
+
+        .upload-area:hover { border-color: var(--accent); }
+        .upload-area p { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-dim); }
+
+        /* Controls */
+        .section {
+            background: var(--secondary);
+            border: 1px solid var(--border);
+            padding: 20px;
             margin-bottom: 20px;
-        }
-
-        .upload-box:hover {
-            border-color: var(--accent);
-            background: rgba(255,255,255,0.05);
-        }
-
-        .upload-box p {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text);
-        }
-
-        /* UI Elements */
-        .controls {
             display: none;
             flex-direction: column;
             gap: 20px;
-            margin-top: 20px;
         }
 
-        .input-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            color: var(--text);
-        }
+        .row { display: flex; justify-content: space-between; align-items: center; }
+        .label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); }
 
         input[type="number"] {
             background: transparent;
             border: none;
             border-bottom: 1px solid var(--border);
             color: var(--accent);
-            width: 40px;
+            width: 50px;
             text-align: center;
             outline: none;
+            font-size: 0.9rem;
         }
 
         button {
             background: var(--accent);
             color: var(--bg);
             border: none;
-            padding: 15px;
+            padding: 14px;
             text-transform: uppercase;
             letter-spacing: 2px;
             font-size: 0.7rem;
             font-weight: bold;
             cursor: pointer;
             transition: var(--transition);
+            width: 100%;
         }
 
-        button:hover { filter: invert(1); }
-        button:disabled { opacity: 0.3; cursor: not-allowed; }
+        button:hover { opacity: 0.8; transform: translateY(-1px); }
+        button:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; transform: none; }
 
-        #status {
-            margin-top: 20px;
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            color: var(--text);
-            letter-spacing: 1px;
+        /* List Items */
+        .clip-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+            gap: 15px;
+            animation: fadeIn 0.4s ease;
         }
 
-        .download-link {
-            display: block;
-            margin-top: 10px;
-            padding: 12px;
+        .clip-item:last-child { border-bottom: none; }
+        
+        .checkbox-container {
+            width: 20px;
+            height: 20px;
             border: 1px solid var(--border);
-            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] { cursor: pointer; filter: grayscale(1); accent-color: white; }
+
+        .clip-info { flex-grow: 1; font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); }
+
+        .download-btn {
             color: var(--accent);
-            font-size: 0.7rem;
-            text-transform: uppercase;
+            text-decoration: none;
+            font-size: 0.6rem;
+            border: 1px solid var(--border);
+            padding: 5px 10px;
             transition: var(--transition);
         }
 
-        .download-link:hover { border-color: var(--accent); }
+        .download-btn:hover { border-color: var(--accent); }
+
+        #status {
+            text-align: center;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            margin: 20px 0;
+        }
 
         #fileInput { display: none; }
+
+        .merge-box {
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Video Splitter</h1>
+        <h1>Video Studio // Batch</h1>
 
-        <div class="upload-box" id="dropZone">
-            <p id="fileNameDisplay">Click or Drop MP4</p>
+        <div class="upload-area" id="dropZone">
+            <p id="fileName">Select or Drop MP4</p>
         </div>
-        
         <input type="file" id="fileInput" accept="video/mp4">
 
-        <div class="controls" id="controls">
-            <div class="input-row">
-                <span>Split into</span>
-                <input type="number" id="clipCount" value="2" min="2">
-                <span>Clips</span>
+        <div class="section" id="splitControls">
+            <div class="row">
+                <span class="label">Number of segments</span>
+                <input type="number" id="clipCount" value="2" min="2" max="20">
             </div>
-            <button id="startBtn">Process Video</button>
+            <button id="startBtn">Split & Smooth Re-encode</button>
         </div>
 
-        <div id="status">Waiting for file...</div>
-        <div id="results"></div>
+        <div id="status">System Standby</div>
+
+        <div class="section" id="resultsSection">
+            <div class="label" style="margin-bottom: 10px;">Output Clips</div>
+            <div id="clipList"></div>
+            
+            <div class="merge-box">
+                <p class="label" style="margin-bottom: 15px;">Select clips above to join them into one video</p>
+                <button id="mergeBtn" disabled>Generate Compilation</button>
+            </div>
+        </div>
     </div>
 
     <script>
         const { createFFmpeg, fetchFile } = FFmpeg;
-        const ffmpeg = createFFmpeg({ log: true });
+        const ffmpeg = createFFmpeg({ log: false });
         
         const fileInput = document.getElementById('fileInput');
         const dropZone = document.getElementById('dropZone');
         const status = document.getElementById('status');
-        const controls = document.getElementById('controls');
+        const splitControls = document.getElementById('splitControls');
+        const resultsSection = document.getElementById('resultsSection');
+        const clipList = document.getElementById('clipList');
         const startBtn = document.getElementById('startBtn');
-        const results = document.getElementById('results');
-        const clipCountInput = document.getElementById('clipCount');
+        const mergeBtn = document.getElementById('mergeBtn');
 
         let videoFile = null;
+        let generatedClips = []; // Stores { name, blobUrl }
 
-        // 1. Initialize FFmpeg immediately
+        // Initialize FFmpeg
         (async () => {
-            status.innerText = "Initializing Engine...";
+            status.innerText = "Loading Engine...";
             await ffmpeg.load();
             status.innerText = "Ready";
         })();
 
-        // 2. Handle File Selection
+        // Interaction
         dropZone.onclick = () => fileInput.click();
-        
-        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = "#fff"; };
-        dropZone.ondragleave = () => { dropZone.style.borderColor = ""; };
-        dropZone.ondrop = (e) => {
-            e.preventDefault();
-            handleFile(e.dataTransfer.files[0]);
-        };
-
         fileInput.onchange = (e) => handleFile(e.target.files[0]);
-
+        
         function handleFile(file) {
-            if (file && file.type.includes("video")) {
+            if (file) {
                 videoFile = file;
-                document.getElementById('fileNameDisplay').innerText = file.name;
-                controls.style.display = "flex";
-                status.innerText = "File loaded. Ready to process.";
+                document.getElementById('fileName').innerText = file.name;
+                splitControls.style.display = "flex";
+                status.innerText = "File Analyzed";
             }
         }
 
-        // 3. Process Video
+        // Split Logic
         startBtn.onclick = async () => {
-            const numClips = parseInt(clipCountInput.value);
+            const numClips = parseInt(document.getElementById('clipCount').value);
             startBtn.disabled = true;
-            results.innerHTML = "";
+            clipList.innerHTML = "";
+            generatedClips = [];
             
-            status.innerText = "Reading video data...";
-            const { name } = videoFile;
+            status.innerText = "Mounting Video...";
             ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(videoFile));
 
-            // Get duration
-            const video = document.createElement('video');
-            video.src = URL.createObjectURL(videoFile);
-            video.onloadedmetadata = async () => {
-                const duration = video.duration;
-                const segmentTime = duration / numClips;
+            const duration = await getVideoDuration(videoFile);
+            const seg = duration / numClips;
 
-                for (let i = 0; i < numClips; i++) {
-                    const start = i * segmentTime;
-                    const output = `part_${i + 1}.mp4`;
-                    status.innerText = `Processing part ${i + 1} of ${numClips}...`;
+            for (let i = 0; i < numClips; i++) {
+                const start = i * seg;
+                const outputName = `clip_${i + 1}.mp4`;
+                status.innerText = `Processing Smooth Clip ${i + 1}/${numClips}...`;
 
-                    // Using "-c copy" for exact quality & speed
-                    await ffmpeg.run('-ss', start.toString(), '-t', segmentTime.toString(), '-i', 'input.mp4', '-c', 'copy', output);
+                /* 
+                   We use '-preset ultrafast' for speed 
+                   and '-crf 18' for high quality.
+                   This fixes the "choppiness" by re-calculating frames at the start of the cut.
+                */
+                await ffmpeg.run(
+                    '-ss', start.toString(),
+                    '-t', seg.toString(),
+                    '-i', 'input.mp4',
+                    '-c:v', 'libx264', 
+                    '-preset', 'ultrafast',
+                    '-crf', '18',
+                    '-c:a', 'aac',
+                    outputName
+                );
 
-                    const data = ffmpeg.FS('readFile', output);
-                    const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
-                    
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = output;
-                    a.className = "download-link";
-                    a.innerText = `Download Part ${i + 1}`;
-                    results.appendChild(a);
-                }
+                const data = ffmpeg.FS('readFile', outputName);
+                const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+                
+                generatedClips.push({ name: outputName, url: url, buffer: data });
+                addClipToUI(i + 1, url);
+            }
 
-                status.innerText = "Done.";
-                startBtn.disabled = false;
-            };
+            resultsSection.style.display = "flex";
+            status.innerText = "Batch Process Complete";
+            startBtn.disabled = false;
         };
+
+        function addClipToUI(index, url) {
+            const div = document.createElement('div');
+            div.className = 'clip-item';
+            div.innerHTML = `
+                <input type="checkbox" class="clip-select" data-index="${index-1}">
+                <div class="clip-info">Part ${index}</div>
+                <a href="${url}" download="clip_${index}.mp4" class="download-btn">Save</a>
+            `;
+            clipList.appendChild(div);
+
+            div.querySelector('input').onchange = () => {
+                const checked = document.querySelectorAll('.clip-select:checked');
+                mergeBtn.disabled = checked.length < 2;
+            };
+        }
+
+        // Merge/Preview Logic
+        mergeBtn.onclick = async () => {
+            const selectedIdx = Array.from(document.querySelectorAll('.clip-select:checked'))
+                                     .map(cb => cb.dataset.index);
+            
+            mergeBtn.disabled = true;
+            status.innerText = "Merging selected clips...";
+
+            // Create a concat list for FFmpeg
+            let concatList = "";
+            selectedIdx.forEach(idx => {
+                const clip = generatedClips[idx];
+                concatList += `file '${clip.name}'\n`;
+            });
+
+            ffmpeg.FS('writeFile', 'concat_list.txt', new TextEncoder().encode(concatList));
+
+            // Run concat command
+            await ffmpeg.run('-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c', 'copy', 'merged.mp4');
+
+            const data = ffmpeg.FS('readFile', 'merged.mp4');
+            const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+
+            const finalLink = document.createElement('a');
+            finalLink.href = url;
+            finalLink.download = "compilation.mp4";
+            finalLink.click();
+
+            status.innerText = "Compilation Downloaded";
+            mergeBtn.disabled = false;
+        };
+
+        function getVideoDuration(file) {
+            return new Promise((resolve) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.onloadedmetadata = () => resolve(video.duration);
+                video.src = URL.createObjectURL(file);
+            });
+        }
     </script>
 </body>
 </html>
