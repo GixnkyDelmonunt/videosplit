@@ -161,42 +161,42 @@
         }
 
         // --- SPLIT LOGIC ---
-        document.getElementById('splitBtn').onclick = async () => {
-            const numClips = parseInt(document.getElementById('clipCount').value);
-            const file = filesList[0];
-            results.innerHTML = "";
-            document.getElementById('splitBtn').disabled = true;
+document.getElementById('splitBtn').onclick = async () => {
+    const numClips = parseInt(document.getElementById('clipCount').value);
+    const file = filesList[0];
+    results.innerHTML = "";
+    document.getElementById('splitBtn').disabled = true;
 
-            status.innerText = "Processing video (Frame-accurate)...";
-            ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(file));
+    status.innerText = "Processing video (Frame-accurate, no re-encode)...";
+    ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(file));
 
-            const tempVid = document.createElement('video');
-            tempVid.src = URL.createObjectURL(file);
-            tempVid.onloadedmetadata = async () => {
-                const segmentTime = tempVid.duration / numClips;
-                for (let i = 0; i < numClips; i++) {
-                    const start = (i * segmentTime).toFixed(3);
-                    const output = `split_${i+1}.mp4`;
-                    status.innerText = `Encoding Part ${i+1}/${numClips}...`;
+    const tempVid = document.createElement('video');
+    tempVid.src = URL.createObjectURL(file);
 
-                    // FIX CHOPPY: Re-encode with high quality (crf 18) and fast preset
-                    await ffmpeg.run(
-                        '-ss', start, 
-                        '-t', segmentTime.toString(), 
-                        '-i', 'input.mp4', 
-                        '-c:v', 'libx264', 
-                        '-crf', '18', 
-                        '-preset', 'ultrafast', 
-                        '-c:a', 'aac', 
-                        output
-                    );
+    tempVid.onloadedmetadata = async () => {
+        const segmentTime = tempVid.duration / numClips;
 
-                    createDownloadLink(output, `Split Part ${i+1}`);
-                }
-                status.innerText = "Split Complete";
-                document.getElementById('splitBtn').disabled = false;
-            };
-        };
+        for (let i = 0; i < numClips; i++) {
+            const start = (i * segmentTime).toFixed(3);
+            const output = `split_${i + 1}.mp4`;
+            status.innerText = `Creating Part ${i + 1}/${numClips}...`;
+
+            // Frame-accurate, no re-encode
+            await ffmpeg.run(
+                '-i', 'input.mp4',   // input first
+                '-ss', start,        // then seek to start
+                '-t', segmentTime.toString(),
+                '-c', 'copy',        // copy streams exactly
+                output
+            );
+
+            createDownloadLink(output, `Split Part ${i + 1}`);
+        }
+
+        status.innerText = "Split Complete";
+        document.getElementById('splitBtn').disabled = false;
+    };
+};
 
         // --- MERGE LOGIC ---
         document.getElementById('mergeBtn').onclick = async () => {
