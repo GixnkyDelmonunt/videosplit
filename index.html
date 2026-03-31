@@ -27,7 +27,7 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            overflow: hidden;
+            overflow-x: hidden;
         }
 
         .container {
@@ -52,42 +52,43 @@
         }
 
         /* Upload Area */
-        .drop-zone {
+        #dropZone {
             border: 1px solid var(--border);
-            padding: 60px 20px;
+            padding: 80px 20px;
             border-radius: 2px;
             cursor: pointer;
             transition: var(--transition);
+            background: rgba(255,255,255,0.01);
             position: relative;
-            background: rgba(255,255,255,0.02);
+            z-index: 10;
         }
 
-        .drop-zone:hover, .drop-zone.dragover {
+        #dropZone:hover {
             border-color: var(--accent);
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.04);
         }
 
-        .drop-zone p {
+        #dropZone.dragover {
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.1);
+            transform: scale(1.02);
+        }
+
+        #dropZone p {
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--text);
+            pointer-events: none;
         }
 
         /* Controls */
-        .controls {
+        #controls {
             margin-top: 30px;
-            display: flex;
+            display: none; /* Hidden until file selected */
             flex-direction: column;
             gap: 20px;
-            opacity: 0;
-            pointer-events: none;
-            transition: var(--transition);
-        }
-
-        .controls.visible {
-            opacity: 1;
-            pointer-events: all;
+            animation: fadeIn 0.5s ease forwards;
         }
 
         .input-group {
@@ -104,7 +105,7 @@
             border: none;
             border-bottom: 1px solid var(--border);
             color: var(--accent);
-            width: 40px;
+            width: 50px;
             text-align: center;
             padding: 5px;
             outline: none;
@@ -117,7 +118,7 @@
             background: var(--accent);
             color: var(--bg);
             border: none;
-            padding: 12px 24px;
+            padding: 15px 30px;
             text-transform: uppercase;
             letter-spacing: 2px;
             font-size: 0.7rem;
@@ -128,22 +129,23 @@
 
         button:hover {
             filter: invert(1);
-            transform: scale(1.02);
         }
 
         button:disabled {
             background: var(--border);
             color: var(--text);
             cursor: not-allowed;
+            filter: none;
         }
 
-        /* Progress */
+        /* Progress & Status */
         #status {
-            margin-top: 20px;
+            margin-top: 25px;
             font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--text);
+            min-height: 1em;
         }
 
         /* Download List */
@@ -158,16 +160,17 @@
         .download-item {
             font-size: 0.7rem;
             text-decoration: none;
-            color: var(--text);
+            color: var(--accent);
             border: 1px solid var(--border);
-            padding: 10px;
+            padding: 12px;
             display: block;
             transition: var(--transition);
+            background: transparent;
         }
 
         .download-item:hover {
-            border-color: var(--accent);
-            color: var(--accent);
+            background: var(--accent);
+            color: var(--bg);
         }
 
         #fileInput { display: none; }
@@ -178,20 +181,20 @@
     <div class="container">
         <h1>Video Batch Splitter</h1>
 
-        <div class="drop-zone" id="dropZone">
+        <div id="dropZone">
             <p id="dropText">Drop MP4 file or click to select</p>
-            <input type="file" id="fileInput" accept="video/mp4">
         </div>
+        <input type="file" id="fileInput" accept="video/mp4">
 
-        <div class="controls" id="controls">
+        <div id="controls">
             <div class="input-group">
-                <label>Number of clips</label>
-                <input type="number" id="clipCount" value="2" min="2" max="20">
+                <label>Split into how many clips?</label>
+                <input type="number" id="clipCount" value="2" min="2" max="50">
             </div>
-            <button id="processBtn">Process & Export</button>
+            <button id="processBtn">Start Batch Process</button>
         </div>
 
-        <div id="status"></div>
+        <div id="status">Ready</div>
         <div id="downloadList"></div>
     </div>
 
@@ -211,47 +214,67 @@
         const downloadList = document.getElementById('downloadList');
         const clipCountInput = document.getElementById('clipCount');
 
-        // Initialize FFmpeg
+        // PREVENT BROWSER FROM OPENING DROPPED FILES
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => e.preventDefault());
+
+        // INITIALIZE FFMPEG
         async function initFFmpeg() {
-            status.innerText = "Loading Engine...";
-            ffmpeg = new FFmpeg();
-            
-            // Load from CDN
-            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-            await ffmpeg.load({
-                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-            });
-            status.innerText = "Engine Ready";
+            try {
+                status.innerText = "Initializing Engine...";
+                ffmpeg = new FFmpeg();
+                
+                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                });
+                status.innerText = "System Ready";
+            } catch (e) {
+                console.error(e);
+                status.innerText = "Error: Check Console (Headers Required)";
+                alert("Note: This requires 'Cross-Origin-Embedder-Policy' headers. If you are testing locally, use a local server or deploy to Netlify with the _headers file.");
+            }
         }
 
         initFFmpeg();
 
-        // File Selection Logic
-        dropZone.onclick = () => fileInput.click();
-        
-        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragover'); };
-        dropZone.ondragleave = () => dropZone.classList.remove('dragover');
-        dropZone.ondrop = (e) => {
+        // FILE HANDLING
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            handleFile(e.dataTransfer.files[0]);
-        };
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFile(files[0]);
+        });
 
-        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
 
         function handleFile(file) {
-            if (file && file.type === "video/mp4") {
+            if (file.type === "video/mp4" || file.name.endsWith('.mp4')) {
                 selectedFile = file;
-                dropText.innerText = file.name;
-                controls.classList.add('visible');
+                dropText.innerText = `Selected: ${file.name}`;
+                controls.style.display = 'flex';
                 downloadList.innerHTML = "";
+                status.innerText = "File loaded. Ready to split.";
             } else {
-                alert("Please select a valid MP4 file.");
+                alert("Please upload an MP4 file.");
             }
         }
 
-        // Processing Logic
+        // PROCESSING
         processBtn.onclick = async () => {
             if (!ffmpeg || !selectedFile) return;
 
@@ -259,12 +282,11 @@
             downloadList.innerHTML = "";
             
             const numClips = parseInt(clipCountInput.value);
-            const fileName = 'input.mp4';
+            const inputFileName = 'input.mp4';
             
-            status.innerText = "Reading File...";
-            await ffmpeg.writeFile(fileName, await fetchFile(selectedFile));
+            status.innerText = "Writing file to memory...";
+            await ffmpeg.writeFile(inputFileName, await fetchFile(selectedFile));
 
-            // Get duration using a temporary video element
             const duration = await getVideoDuration(selectedFile);
             const segmentDuration = duration / numClips;
 
@@ -273,12 +295,12 @@
                 const outputName = `clip_${i + 1}.mp4`;
                 status.innerText = `Processing Clip ${i + 1} of ${numClips}...`;
 
-                // -c copy is the secret to "Exact Quality" - it doesn't re-encode, just cuts
+                // '-c copy' ensures exact same quality (no re-encoding)
                 await ffmpeg.exec([
-                    '-i', fileName,
                     '-ss', startTime.toString(),
                     '-t', segmentDuration.toString(),
-                    '-c', 'copy', 
+                    '-i', inputFileName,
+                    '-c', 'copy',
                     outputName
                 ]);
 
@@ -289,11 +311,11 @@
                 link.href = url;
                 link.download = outputName;
                 link.className = 'download-item';
-                link.innerText = `DOWNLOAD CLIP ${i + 1} (${Math.round(segmentDuration)}s)`;
+                link.innerText = `Download Part ${i + 1} (${Math.round(segmentDuration)}s)`;
                 downloadList.appendChild(link);
             }
 
-            status.innerText = "Batch Complete.";
+            status.innerText = "All clips processed successfully.";
             processBtn.disabled = false;
         };
 
